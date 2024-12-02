@@ -1,6 +1,7 @@
 chatlog/
 vosk-model-small-*
 res.mp3
+CERT.json
 
 # Logs
 logs
