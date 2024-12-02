@@ -4,7 +4,7 @@ const fs = require("fs");
 const mic = require('mic');
 const Speaker = require('speaker');
 const stream = require('stream');
-const Vosk = require('vosk');
+const speech = require('@google-cloud/speech');
 const tts = require('google-tts-api');
 const ffmpeg = require('fluent-ffmpeg');
 
@@ -98,22 +98,31 @@ const micInputStream = micInstance.getAudioStream();
 const audioBufferStream = new AudioBufferStream();
 micInputStream.pipe(audioBufferStream);
 
-Vosk.setLogLevel(-1);
-const voskModel = new Vosk.Model("vosk-model-small-en-us-0.15");
-const recognizer = new Vosk.Recognizer({ model: voskModel, sampleRate: 16000 });
+const speechclient = new speech.SpeechClient({
+  keyFilename: 'CERT.json',
+});
 
-function transcribe(audioBuffer) {
-  recognizer.acceptWaveform(audioBuffer);
-  return recognizer.result();
+async function transcribe(audioBuffer) {
+  const res = await speechclient.recognize({
+    audio: {
+      content: audioBuffer.toString('base64')
+    }, config: {
+      encoding: 'LINEAR16',
+      sampleRateHertz: 16000,
+      languageCode: 'en-US',
+    }
+  });
+  return res[0] ?
+    res[0].results.map((result) => result.alternatives[0].transcript).join('\n') :
+    '';
 }
 
 micInputStream.on('data', (data) => {
-  console.log(avg(data));
-  if (recFirst == true) return recFirst = false;
+  if (recFirst < 5) return recFirst++;
   if (avg(data) > 8) {
     if (!recStart) recStart = Date.now();
     if (Date.now() - recStart > 100 && recStartDone == false) {
-      audioChunks = oldChunks.slice(-4);
+      audioChunks = oldChunks.slice(-5);
       oldChunks = [];
       recStartDone = true;
       console.log('Started recording...');
@@ -138,20 +147,33 @@ function silence() {
     return end();
 }
 
-function end() {
-  console.log('Stopped recording...');
-  silenceStart = null;
-  recStartDone = false;
-  recStart = null;
-  micInstance.pause();
-  const audioBuffer = Buffer.concat(audioChunks);
-  var { text } = transcribe(audioBuffer);
-  if (text) {
-    console.log('user:', text);
-    sendmsg(text).then(() => {
+async function end() {
+  try {
+    console.log('Stopped recording...');
+    silenceStart = null;
+    recStartDone = false;
+    recStart = null;
+    micInstance.pause();
+    // const newping = new Speaker({
+    //   channels: 1,
+    //   bitDepth: 16,
+    //   sampleRate: 24000
+    // });
+    // newping.write(ping);
+    // newping.end();
+    const audioBuffer = Buffer.concat(audioChunks);
+    var text = await transcribe(audioBuffer);
+    if (text) {
+      console.log('user:', text);
+      await sendmsg(text)
       audioChunks = [];
-      setTimeout(start, 1000)
-    })
+    } else {
+      console.log('request empty');
+    }
+    setTimeout(start, 100)
+  } catch (e) {
+    console.error(e);
+    setTimeout(start, 1000)
   }
 }
 
@@ -162,12 +184,12 @@ function avg(data) {
     s = data[i] - 128;
     sum += s * s;
   }
-  const rms = Math.abs(128 - Math.sqrt(sum / data.length));
+  const rms = 103 - Math.sqrt(sum / data.length);
   return rms;
 }
 
 function start(x) {
-  recFirst = true;
+  recFirst = 0;
   if (x)
     micInstance.start();
   else
@@ -201,9 +223,8 @@ async function dotts(text) {
     bitDepth: 16,
     sampleRate: 24000
   });
-  audioStream = new stream.Readable();
-  audioStream.push(ping);
-  audio.pipe(audioStream).pipe(speaker);
+  speaker.write(ping);
+  audio.pipe(speaker);
   return speaker;
 }
 
