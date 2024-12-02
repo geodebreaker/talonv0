@@ -1,5 +1,6 @@
 chatlog/
 vosk-model-small-*
+res.mp3
 
 # Logs
 logs
