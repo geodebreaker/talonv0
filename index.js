@@ -16,7 +16,9 @@ const prompt =
   'DUE TO TTS, DO NOT CORRECT THEM ON ANYTHING. ' +
   'You are using STT and TTS so some words may be mispelled. ' +
   'Keep messages as simple and as short as possible! ' +
-  'You also cannot use MD since TTS. ';
+  'You also cannot use MD since TTS. ' +
+  'If you are asked to play a song type in [play:MUSICIAN - SONG NAME]. ' +
+  'You can stop the song by saying [stop]';
 
 function load() {
   try {
@@ -54,8 +56,19 @@ async function sendmsg(data) {
 
 async function sendmsgres(e) {
   console.log('res:', e);
-  var x = await dotts(e)
-  speakerToEnd = x;
+  let blank = null;
+  const regex = /\[(play|stop):?(.*?)]/g;
+  if (e.match(regex)) {
+    blank = e.replace(regex, '');
+    const cmd = regex.exec(e);
+    if (cmd[1] == 'play') {
+      playSong(cmd[2])
+    } else if (music) {
+      music.end();
+      music = null;
+    }
+  }
+  await dotts(blank ?? e);
 }
 
 async function init() {
@@ -93,7 +106,6 @@ const micInstance = mic({
   device: 'hw:0,0',
   debug: false,
 });
-let speakerToEnd = null;
 const micInputStream = micInstance.getAudioStream();
 const audioBufferStream = new AudioBufferStream();
 micInputStream.pipe(audioBufferStream);
@@ -118,15 +130,15 @@ async function transcribe(audioBuffer) {
 }
 
 micInputStream.on('data', (data) => {
+  if (process.argv[2] == '1') console.log(avg(data));
   if (recFirst < 5) return recFirst++;
-  if (avg(data) > 8) {
+  if (avg(data) > 5) {
     if (!recStart) recStart = Date.now();
     if (Date.now() - recStart > 100 && recStartDone == false) {
       audioChunks = oldChunks.slice(-5);
       oldChunks = [];
       recStartDone = true;
       console.log('Started recording...');
-      if (speakerToEnd) speakerToEnd.end();
     }
     if (Date.now() - recStart < 100 && recStart) return;
     silenceStart = null;
@@ -154,13 +166,15 @@ async function end() {
     recStartDone = false;
     recStart = null;
     micInstance.pause();
-    // const newping = new Speaker({
-    //   channels: 1,
-    //   bitDepth: 16,
-    //   sampleRate: 24000
-    // });
-    // newping.write(ping);
-    // newping.end();
+    if (!music) {
+      let mkping = new Speaker({
+        channels: 1,
+        bitDepth: 16,
+        sampleRate: 24000
+      });
+      mkping.write(lping);
+      mkping.end();
+    }
     const audioBuffer = Buffer.concat(audioChunks);
     var text = await transcribe(audioBuffer);
     if (text) {
@@ -169,12 +183,20 @@ async function end() {
       audioChunks = [];
     } else {
       console.log('request empty');
+      if (!music) {
+        let mkping = new Speaker({
+          channels: 1,
+          bitDepth: 16,
+          sampleRate: 24000
+        });
+        mkping.write(ping);
+        mkping.end();
+      }
     }
-    setTimeout(start, 100)
   } catch (e) {
     console.error(e);
-    setTimeout(start, 1000)
   }
+  start();
 }
 
 function avg(data) {
@@ -200,6 +222,7 @@ function start(x) {
 /////////////////////////////////////////////////////////////
 
 const ping = fs.readFileSync('ping.raw');
+const lping = fs.readFileSync('listen.raw');
 
 async function dotts(text) {
   console.log('Getting tts...');
@@ -225,9 +248,38 @@ async function dotts(text) {
   });
   speaker.write(ping);
   audio.pipe(speaker);
+  await new Promise(y => speaker.on('finish', y));
   return speaker;
 }
 
-/////////////////////////////
+////////////////////////////////////////
+
+let music = null;
+const ytSearch = require('yt-search');
+const ytdl = require('@distube/ytdl-core');
+
+async function playSong(query) {
+  try {
+    console.log('Playing song', query);
+    const searchResults = await ytSearch(query);
+    const firstVideo = searchResults.videos[0];
+
+    if (!firstVideo) return;
+
+    console.log(`Downloading audio from: ${firstVideo.title}`);
+
+    ffmpeg(ytdl(firstVideo.url, { filter: 'audioonly', quality: 'highestaudio' }))
+      .format('s16le')
+      .audioChannels(1)
+      .audioFrequency(16000)
+      .pipe(music = new Speaker({
+        channels: 1,
+        bitDepth: 16,
+        sampleRate: 16000
+      }));
+  } catch (error) {
+    console.error('Error searching YouTube:', error);
+  }
+}
 
 init();
