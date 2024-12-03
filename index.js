@@ -62,9 +62,13 @@ async function sendmsgres(e) {
     blank = e.replace(regex, '');
     const cmd = regex.exec(e);
     if (cmd[1] == 'play') {
-      playSong(cmd[2])
+      if (music) {
+        music.close();
+        music = null;
+      }
+      playSong(cmd[2]);
     } else if (music) {
-      music.end();
+      music.close();
       music = null;
     }
   }
