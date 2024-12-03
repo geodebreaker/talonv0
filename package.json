@@ -10,6 +10,7 @@
   "author": "geodebreaker",
   "license": "MIT",
   "dependencies": {
+    "@distube/ytdl-core": "^4.15.1",
     "@google-cloud/speech": "^6.7.0",
     "dotenv": "^16.4.5",
     "fluent-ffmpeg": "^2.1.3",
@@ -18,6 +19,7 @@
     "node-wav": "^0.0.2",
     "openai": "^4.73.1",
     "speaker": "^0.5.5",
-    "vosk": "^0.3.39"
+    "vosk": "^0.3.39",
+    "yt-search": "^2.12.1"
   }
 }
