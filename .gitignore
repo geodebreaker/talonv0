@@ -1,7 +1,7 @@
-chatlog/
-vosk-model-small-*
-res.mp3
-CERT.json
+chatlog.json
+warnings.txt
+private/
+music_cache/*.mp3
 
 # Logs
 logs
