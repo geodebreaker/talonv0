@@ -13,9 +13,9 @@ it only might work on other systems
 3. Make sure you have `node` (v23.3.0) and `npm`
 4. Run `npm i`
 5. Set up Google Cloud STT
-  1. [Go to Google Cloud Console](https://console.cloud.google.com/)
-  2. Make sure you have a project, or select a new one
-  3. [Go to the STT API page](https://console.cloud.google.com/apis/library/speech.googleapis.com)
+- 1. [Go to Google Cloud Console](https://console.cloud.google.com/)
+- 2. Make sure you have a project, or select a new one
+- 3. [Go to the STT API page](https://console.cloud.google.com/apis/library/speech.googleapis.com)
   4. Click enable
   5. Set up billing if you do not have it set up already
   6. [Go to Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
