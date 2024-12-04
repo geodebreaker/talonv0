@@ -56,7 +56,6 @@ async function sendmsg(data) {
 
 async function sendmsgres(e) {
   console.log('res:', e);
-  await dotts(blank ?? e);
   let blank = null;
   const regex = /\[(play|stop):?(.*?)]/g;
   if (e.match(regex)) {
@@ -73,6 +72,7 @@ async function sendmsgres(e) {
       music = null;
     }
   }
+  await dotts(blank ?? e);
 }
 
 async function init() {
