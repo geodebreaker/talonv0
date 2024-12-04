@@ -16,8 +16,8 @@ const prompt =
   'You are using STT and TTS so some words may be mispelled. ' +
   'Keep messages as simple and as short as possible! ' +
   'You also cannot use MD since TTS. ' +
-  'If you are asked to play a song / sfx type in [play:MUSICIAN - SONG NAME] and say something like "' +
-  'Playing XYZ by ABC". ' +
+  'If you are asked to play a song / sfx type in [play:musician - song name] and say something like "' +
+  'Playing XYZ by ABC". This will download the song from youtube.' +
   'You can stop the song by saying [stop]';
 
 function load() {
@@ -282,13 +282,13 @@ async function playSong(query) {
     music = new Speaker({
       channels: 1,
       bitDepth: 16,
-      sampleRate: 24000
+      sampleRate: 44100
     });
 
     ffmpeg(mp3)
       .format('s16le')
       .audioChannels(1)
-      .audioFrequency(24000)
+      .audioFrequency(44100)
       .pipe(music);
 
     music.on('finish', () => music = null);
