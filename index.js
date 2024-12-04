@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("dotenv").config({ path: 'private/.env' });
 const { OpenAI } = require("openai");
 const fs = require("fs");
 const mic = require('mic');
@@ -10,29 +10,29 @@ const ffmpeg = require('fluent-ffmpeg');
 
 const ai = new OpenAI({ apiKey: process.env.AIKEY });
 var msgs = [];
-const chat = process.env.CHAT;
 const prompt =
   'You are an ai assistant named "talon" which may be mispelled as "town" or "tell em" ' +
   'DUE TO TTS, DO NOT CORRECT THEM ON ANYTHING. ' +
   'You are using STT and TTS so some words may be mispelled. ' +
   'Keep messages as simple and as short as possible! ' +
   'You also cannot use MD since TTS. ' +
-  'If you are asked to play a song type in [play:MUSICIAN - SONG NAME]. ' +
+  'If you are asked to play a song / sfx type in [play:MUSICIAN - SONG NAME] and say something like "' +
+  'Playing XYZ by ABC". ' +
   'You can stop the song by saying [stop]';
 
 function load() {
   try {
-    msgs = JSON.parse(fs.readFileSync('chatlog/' + chat + '.json').toString());
-    console.log('Loaded messages for', chat + '...');
+    msgs = JSON.parse(fs.readFileSync('chatlog.json').toString());
+    console.log('Loaded messages');
   } catch (e) {
-    console.error('There was an error loading messages for', chat);
+    console.error('There was an error loading messages');
     msgs = [];
   }
 }
 
 function save() {
-  fs.writeFileSync('chatlog/' + chat + '.json', JSON.stringify(msgs));
-  console.log('Saved messages for', chat);
+  fs.writeFileSync('chatlog.json', JSON.stringify(msgs));
+  console.log('Saved messages');
 }
 
 async function runai() {
@@ -56,6 +56,7 @@ async function sendmsg(data) {
 
 async function sendmsgres(e) {
   console.log('res:', e);
+  await dotts(blank ?? e);
   let blank = null;
   const regex = /\[(play|stop):?(.*?)]/g;
   if (e.match(regex)) {
@@ -72,7 +73,6 @@ async function sendmsgres(e) {
       music = null;
     }
   }
-  await dotts(blank ?? e);
 }
 
 async function init() {
@@ -115,7 +115,7 @@ const audioBufferStream = new AudioBufferStream();
 micInputStream.pipe(audioBufferStream);
 
 const speechclient = new speech.SpeechClient({
-  keyFilename: 'CERT.json',
+  keyFilename: 'private/CERT.json',
 });
 
 async function transcribe(audioBuffer) {
@@ -225,8 +225,8 @@ function start(x) {
 
 /////////////////////////////////////////////////////////////
 
-const ping = fs.readFileSync('ping.raw');
-const lping = fs.readFileSync('listen.raw');
+const ping = fs.readFileSync('sound/ping.raw');
+const lping = fs.readFileSync('sound/listen.raw');
 
 async function dotts(text) {
   console.log('Getting tts...');
@@ -237,7 +237,6 @@ async function dotts(text) {
     host: 'https://translate.google.com',
   });
   const buffer = Buffer.from(b64, 'base64');
-  fs.writeFileSync('res.mp3', buffer)
   let audioStream = new stream.Readable();
   audioStream.push(buffer);
   audioStream.push(null);
@@ -264,23 +263,35 @@ const ytdl = require('@distube/ytdl-core');
 
 async function playSong(query) {
   try {
-    console.log('Playing song', query);
     const searchResults = await ytSearch(query);
     const firstVideo = searchResults.videos[0];
 
     if (!firstVideo) return;
 
-    console.log(`Downloading audio from: ${firstVideo.title}`);
+    let mp3 = null;
+    if (fs.existsSync('music_cache/' + firstVideo.videoId + '.mp3')) {
+      console.log(`Playing cached audio from: ${firstVideo.title}`);
+      mp3 = fs.createReadStream('music_cache/' + firstVideo.videoId + '.mp3');
+    } else {
+      console.log(`Downloading audio from: ${firstVideo.title}`);
+      mp3 = new stream.PassThrough();
+      ytdl(firstVideo.url, { filter: 'audioonly', quality: 'highestaudio' }).pipe(mp3);
+      mp3.pipe(fs.createWriteStream('music_cache/' + firstVideo.videoId + '.mp3'));
+    }
 
-    ffmpeg(ytdl(firstVideo.url, { filter: 'audioonly', quality: 'highestaudio' }))
+    music = new Speaker({
+      channels: 1,
+      bitDepth: 16,
+      sampleRate: 24000
+    });
+
+    ffmpeg(mp3)
       .format('s16le')
       .audioChannels(1)
-      .audioFrequency(16000)
-      .pipe(music = new Speaker({
-        channels: 1,
-        bitDepth: 16,
-        sampleRate: 16000
-      }));
+      .audioFrequency(24000)
+      .pipe(music);
+
+    music.on('finish', () => music = null);
   } catch (error) {
     console.error('Error searching YouTube:', error);
   }
