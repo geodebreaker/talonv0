@@ -273,6 +273,7 @@ async function playSong(query) {
       console.log(`Playing cached audio from: ${firstVideo.title}`);
       mp3 = fs.createReadStream('music_cache/' + firstVideo.videoId + '.mp3');
     } else {
+      if (!fs.existsSync('music_cache')) fs.mkdirSync('music_cache');
       console.log(`Downloading audio from: ${firstVideo.title}`);
       mp3 = new stream.PassThrough();
       ytdl(firstVideo.url, { filter: 'audioonly', quality: 'highestaudio' }).pipe(mp3);
