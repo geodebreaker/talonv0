@@ -7,6 +7,7 @@ const stream = require('stream');
 const speech = require('@google-cloud/speech');
 const tts = require('google-tts-api');
 const ffmpeg = require('fluent-ffmpeg');
+const Vosk = require('vosk');
 
 const ai = new OpenAI({ apiKey: process.env.AIKEY });
 var msgs = [];
@@ -19,6 +20,13 @@ const prompt =
   'If you are asked to play a song / sfx type in [play:musician - song name] and say something like "' +
   'Playing XYZ by ABC". This will download the song from youtube.' +
   'You can stop the song by saying [stop]';
+const validReq = [
+  'talon',
+  'tom',
+  'town',
+  'tell him',
+  'tell em'
+];
 
 function load() {
   try {
@@ -133,6 +141,15 @@ async function transcribe(audioBuffer) {
     '';
 }
 
+Vosk.setLogLevel(-1);
+const voskModel = new Vosk.Model("vosk_model");
+const recognizer = new Vosk.Recognizer({ model: voskModel, sampleRate: 16000 });
+
+function transcribeVosk(audioBuffer) {
+  recognizer.acceptWaveform(audioBuffer);
+  return recognizer.result().text;
+}
+
 micInputStream.on('data', (data) => {
   if (process.argv[2] == '1') console.log(avg(data));
   if (recFirst < 5) return recFirst++;
@@ -170,31 +187,35 @@ async function end() {
     recStartDone = false;
     recStart = null;
     micInstance.pause();
-    if (!music) {
-      let mkping = new Speaker({
-        channels: 1,
-        bitDepth: 16,
-        sampleRate: 24000
-      });
-      mkping.write(lping);
-      mkping.end();
-    }
     const audioBuffer = Buffer.concat(audioChunks);
-    var text = await transcribe(audioBuffer);
-    if (text) {
-      console.log('user:', text);
-      await sendmsg(text)
-      audioChunks = [];
-    } else {
-      console.log('request empty');
+    var voskText = transcribeVosk(audioBuffer.subarray(0, 64000));
+    console.log('trig:', voskText);
+    if (!validReq.every(x => !voskText.includes(x))) {
       if (!music) {
         let mkping = new Speaker({
           channels: 1,
           bitDepth: 16,
           sampleRate: 24000
         });
-        mkping.write(ping);
+        mkping.write(lping);
         mkping.end();
+      }
+      var text = await transcribe(audioBuffer);
+      if (text) {
+        console.log('user:', text);
+        await sendmsg(text)
+        audioChunks = [];
+      } else {
+        console.log('request empty');
+        if (!music) {
+          let mkping = new Speaker({
+            channels: 1,
+            bitDepth: 16,
+            sampleRate: 24000
+          });
+          mkping.write(ping);
+          mkping.end();
+        }
       }
     }
   } catch (e) {

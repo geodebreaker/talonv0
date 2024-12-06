@@ -2,7 +2,8 @@
 
 ### description
 
-really bad ai assistant
+really bad ai assistant named `talon`
+say talon at the start of requests to activate
 i only know this works with debian 12
 it only might work on other systems
 
@@ -43,3 +44,7 @@ it only might work on other systems
   - although i did not put any comments in my code
   - so if it does not work now, though luck buddy!
 3. convince the ai to overthrough the government
+
+### notes
+
+i kept in the `vosk_model` in so it takes up some space
